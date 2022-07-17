@@ -1,0 +1,181 @@
+import React, { useState } from 'react';
+import { useStripe, useElements, CardNumberElement, CardExpiryElement, CardCvcElement } from '@stripe/react-stripe-js'
+import { Grid, TextField, Box, Typography, List, ListItem, IconButton, ListItemText, Avatar, ListItemAvatar, Checkbox, Radio, RadioGroup, FormControlLabel, FormControl, Button } from '@mui/material'
+import axios from 'axios';
+import { APIURL } from '../../config'
+const ELEMENT_OPTIONS = {
+    style: {
+        base: {
+            fontSize: '18px',
+            color: '#424770',
+            letterSpacing: '0.025em',
+            '::placeholder': {
+                color: '#aab7c4',
+            },
+            textAlign: 'left'
+        },
+        invalid: {
+            color: '#9e2146',
+        },
+    },
+};
+const payment = [
+    {
+        "cardType": "Visa",
+        "expiry": "07/24",
+        "last4Digit": "8238",
+        "icon": "/payment/visa.png",
+        "lastUsed": "Thu, Mar 23 2022"
+    },
+    {
+        "cardType": "Discover",
+        "expiry": "02/23",
+        "last4Digit": "1234",
+        "icon": "/payment/gPay.png",
+        "lastUsed": "Never Used"
+    }
+]
+const CheckoutForm = ({ bookingId, users }) => {
+    const elements = useElements();
+    const stripe = useStripe();
+    const [name, setName] = useState('');
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+
+        if (!stripe || !elements) {
+            return;
+        }
+
+        const card = elements.getElement(CardNumberElement);
+
+        if (card == null) {
+            return;
+        }
+
+        const payload = await stripe.createPaymentMethod({
+            type: 'card',
+            card,
+            billing_details: {
+                name,
+            },
+        });
+
+        if (payload.error) {
+            console.log('[error]', payload.error);
+        } else {
+            console.log('[PaymentMethod]', payload.paymentMethod);
+            // SAVE TO DATABASE
+            const dataPayment = {
+                name: name,
+                number: '4242424242424242',
+                exp_month: payload.paymentMethod.card.exp_month.toString(),
+                exp_year: payload.paymentMethod.card.exp_year.toString(),
+                address_country: payload.paymentMethod.card.country,
+                booking_id: bookingId,
+                user_id: users.id,
+                address_zip: '1231',
+                cvc: 567,
+            }
+
+
+            console.log('Data payment: ', dataPayment)
+            const url = APIURL + 'payment/booking/by-stripe'
+            console.log('URL:', url)
+            axios.post(url, dataPayment).then(res => {
+                console.log('Payment Complete: ', res.data)
+                // if (result) {
+                //     navigate('/dashboard')
+                // }
+            })
+        }
+
+
+
+    };
+
+    return (
+        <>
+            <form onSubmit={handleSubmit}>
+                <Box sx={{ borderBottom: '1px solid #545861', my: 2 }}>
+                    <Typography>Payments Details</Typography>
+                </Box>
+
+                <Box>
+                    {
+                        payment.map((item) => (
+                            <List sx={{ p: 1 }}>
+                                <ListItem
+                                    secondaryAction={
+                                        <img edge="end" src={item.icon} alt="" />
+                                    }
+                                    sx={{ borderBottom: '1px solid #545861', my: 2 }}
+                                >
+                                    <ListItemAvatar>
+                                        <Radio />
+                                    </ListItemAvatar>
+                                    <ListItemText
+                                        primary={`Ending In:....${item.last4Digit}`}
+                                        secondary={`Last time used:  ${item.lastUsed}`}
+                                    />
+                                </ListItem>
+                            </List>
+                        ))
+                    }
+
+                </Box>
+
+
+                <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 8, md: 12 }}>
+                    <Grid item xs={12} sm={6} md={6}>
+                        <Typography sx={{ textAlign: 'left' }}>Card Number</Typography>
+                        <Box sx={{ border: '1px solid #545861', p: 2 }}>
+                            <CardNumberElement
+                                id="cardNumber"
+                                options={ELEMENT_OPTIONS}
+                                className='cardInput'
+                            />
+                        </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={6}>
+                        <Typography sx={{ textAlign: 'left' }}>Card Holder Name</Typography>
+                        <TextField
+                            sx={{ width: '100%' }}
+                            id="name"
+                            required
+                            placeholder='Card Holder Name'
+                            value={name}
+                            onChange={(e) => {
+                                setName(e.target.value);
+                            }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={6}>
+                        <Typography sx={{ textAlign: 'left' }}>Card Expiration</Typography>
+                        <Box sx={{ border: '1px solid #545861', p: 2 }}>
+                            <CardExpiryElement
+                                id="expiry"
+                                options={ELEMENT_OPTIONS}
+                                label="Card Expiration"
+                            />
+                        </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={6}>
+                        <Typography sx={{ textAlign: 'left' }}>CVC</Typography>
+                        <Box sx={{ border: '1px solid #545861', p: 2 }}>
+                            <CardCvcElement
+                                id="cvc"
+                                options={ELEMENT_OPTIONS}
+                            />
+                        </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={12} md={12}>
+                        <Button sx={{ my: 2 }} type="submit" variant="contained" disabled={!stripe}>Pay</Button>
+                    </Grid>
+                </Grid>
+            </form>
+        </>
+
+    );
+};
+
+export default CheckoutForm
